@@ -62,6 +62,7 @@ int main(int argc,char ** argv)
         cout << "argv[5]= flag to enable local optimization(1 to enable, 0 to disable)\n";
         exit(-1);
     }
+    //intrinsic camera parameters
     Mat distcoef = (Mat_<float>(1, 5) << 0.2624, -0.9531, -0.0054, 0.0026, 1.1633);
 	Mat distor = (Mat_<float>(5, 1) << 0.2624, -0.9531, -0.0054, 0.0026, 1.1633);
 	distor.convertTo(distor, CV_64F);
@@ -70,50 +71,68 @@ int main(int argc,char ** argv)
 	distcoef.convertTo(distcoef, CV_64F);
     double focal_length=516.9;
     cv::Point2d pp=cv::Point2d(318.6,255.3);
-    Eigen::Vector2d principal_point(318.6,255.3); 
+    Eigen::Vector2d principal_point(318.6,255.3);
+
     //number of images to compose the initial map
     int nImages =  atoi(argv[2]);
+
     //number of dataset images
     int total_images;
     sscanf(argv[3],"%d",&total_images);
+
     //flag to enable local optimization
     int use_local_opt;
     sscanf(argv[5],"%d",&use_local_opt);
+
     //identifier for 3d_point
     int ident=0;
+
     //threshold to detect points tha are seen in more than img_threshol images
     int img_threshold=3;
+
     //threshold for the first filter to recject bad matches between features
     double dst_ratio=0.7;
+
     //variables for the RANSAC algorithm
     double confidence=0.999;
     double reproject_err=1.0;
+
     //g2o iterations
     int niter=50;
+
     //threshold to compare the histograms of the appearance of vocabulary words in the image
     double dbow2_threshold=0.18;
+
     //number of keyframes to be used by the local optimization module
     int window_size=20;
+
     //initial depth for the three-dimensional points of the environment
     double z_plane=1.5;
+
     //first index of dataset
     int current_frame,last_frame;
     last_frame=0;
+
     //we need variables to store the last image and the last features & descriptors
     auto pt =ORB::create();
     Mat foto1_u;
     vector<KeyPoint> features1;
     Mat descriptors1;
+
     //initialize viewer and pointcloud
     pcl::visualization::PCLVisualizer viewer("Viewer");
 	viewer.setBackgroundColor(0.35, 0.35, 0.35);
     viewer.initCameraParameters();
     pcl::PointCloud<pcl::PointXYZ> cloud;
+
     //custom class to store matching between images
     tracking_store tracks;
+
     //load first image who will be the first keyframe
     foto1_u = loadImage(argv[1], current_frame, intrinsic, distcoef);
     pt->detectAndCompute(foto1_u, Mat(), features1, descriptors1);
+
+
     current_frame=last_frame;
     vector<int> keyframes;
     vector<int> valid_points;
@@ -121,26 +140,35 @@ int main(int argc,char ** argv)
     tracks.valid_frames.push_back(1);
     tracks.frames_id.push_back(current_frame);
     current_frame++;
+
+    //creation of two-dimensional correspondences
     while(current_frame<nImages)
     {   
         //load new image
         Mat foto2_u = loadImage(argv[1], current_frame, intrinsic, distcoef);
-        //create pair of features
         vector<KeyPoint> features2;
 	    Mat descriptors2;
 	    pt->detectAndCompute(foto2_u, Mat(), features2, descriptors2);
+
+        //matches between images
         vector<int> left_index_matches, right_index_matches;
         matchFeatures(features1, descriptors1, features2, descriptors2, left_index_matches, right_index_matches,
-		      dst_ratio,confidence,reproject_err,focal_length,pp);
+                      dst_ratio,confidence,reproject_err,focal_length,pp);
+
+        //show matches for debug             
         displayMatches(foto1_u, features1, left_index_matches,foto2_u, features2, right_index_matches);
         Mat used_features=Mat::zeros(1,int(left_index_matches.size()),CV_64F);
+
         if(ident>0)
         {
             add_new_projection_for_existent_point(ident,last_frame,current_frame,features1,features2,
-						  left_index_matches,right_index_matches,used_features,tracks);
+                                                  left_index_matches,right_index_matches,
+                                                  used_features,tracks);
         }
         add_new_points_proyections(features1,features2,left_index_matches,right_index_matches,ident,last_frame,current_frame,
-				   used_features,tracks);
+                                   used_features,tracks);
+
+        //update variables for next iteration
         foto1_u=foto2_u;
         features1=features2;
         descriptors1=descriptors2;
@@ -151,12 +179,14 @@ int main(int argc,char ** argv)
         tracks.frames_id.push_back(current_frame);
         current_frame++;
     }
-    //prepare varibles for g2o optimization
+    //initial map for the visual odometry system
     initial_map_generation(tracks,nImages,img_threshold,ident,focal_length,principal_point,valid_points,keyframes,niter,z_plane);
     int last_found=0;
     double score=1;
+
     while(current_frame<total_images || !last_found)
     {
+        //keyframe detection
         vector<KeyPoint> features2;
         cv::Mat descriptors2;
         cv::Mat foto2_u=loadImage(argv[1],current_frame,intrinsic,distcoef);
@@ -165,26 +195,27 @@ int main(int argc,char ** argv)
         changeStructure(descriptors1,left_descriptors);
         changeStructure(descriptors2,right_descriptors);
         score=calculate_score(last_frame,current_frame,left_descriptors,right_descriptors,argv[4]);
+
         if(score<= dbow2_threshold)
         {
-            //keyframe found. Let's match features between them
+            //keyframe found. Let's match features between the last keyframe and the current keyframe
             vector<Point2f> left_points,right_points;
             vector<int> left_idx,right_idx;
             cv::Mat mask;
             cv::Mat E;
             int res;
+
+            //feature matching with custom filter and RANSAC filter
             matchFeatures_and_compute_essential(foto1_u,foto2_u,last_frame,current_frame,features1,features2,descriptors1,descriptors2
             ,left_points,right_points,left_idx,right_idx,mask,dst_ratio,
             E,focal_length,confidence,reproject_err,pp,tracks);
+
+            /*motion calculation. here we have two possibilities. If the keyframe is usefull for the 3d reconstruction
+            we update the camera pose and the 3D points map. Other way we discard the current keyframe and we search a new one*/
             double scale=1;
             vector<Point3d> triangulated_points,new_points;
-            res=estimate_motion_and_calculate_3d_points(last_frame,current_frame,foto1_u,foto2_u,left_points,
-							right_points,left_idx,right_idx,ident,intrinsic,E,
-							focal_length,pp,scale,mask,triangulated_points,tracks,valid_points,new_points);
-            if(use_local_opt)
-            {
-                local_optimization(window_size,tracks,niter,ident,focal_length,principal_point);
-            }
+            res=estimate_motion_and_calculate_3d_points(last_frame,current_frame,foto1_u,foto2_u,left_points,right_points,left_idx,right_idx,
+            ident,intrinsic,E,focal_length,pp,scale,mask,triangulated_points,tracks,valid_points,new_points);
             if(res==1)
             {
                 score=1;
@@ -202,6 +233,12 @@ int main(int argc,char ** argv)
                 last_found=0;
                 current_frame++;
             }
+
+            //local optimization
+            if(use_local_opt && res)
+            {
+                local_optimization(window_size,tracks,niter,ident,focal_length,principal_point);
+            }
         }
         else
         {
@@ -211,6 +248,8 @@ int main(int argc,char ** argv)
             current_frame++;
         }
     }
+
+    //graphical representation of the trajectory and output data generation
     mkdir("./lectura_datos", 0777);
     std::ofstream file("./lectura_datos/odometry.txt");
     if (!file.is_open()) return -1;
