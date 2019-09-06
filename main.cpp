@@ -51,15 +51,16 @@
 
 int main(int argc,char ** argv)
 {
+    //help
     if(argc<6)
     {
         cout<< "bad input\n";
         cout << "please enter:\n";
-        cout << "argv[1]= path to rgb images. the images must be called left_i being i the image number\n";
+        cout << "argv[1]= path to rgb images.the images must be called left_i being i the image number\n";
         cout << "argv[2]= number of images to compose the initial map\n";
         cout << "argv[3]= number of dataset images\n";
         cout<<  "argv[4]= path to vocabulary\n";
-        cout << "argv[5]= flag to enable local optimization(1 to enable, 0 to disable)\n";
+        cout << "argv[5]= flag to enable local optimization (1 to enable, 0 to disable)\n";
         exit(-1);
     }
     //intrinsic camera parameters
@@ -100,7 +101,8 @@ int main(int argc,char ** argv)
     //g2o iterations
     int niter=50;
 
-    //threshold to compare the histograms of the appearance of vocabulary words in the image
+    /*threshold to compare the histograms of the appearance of vocabulary words in 
+    the image*/
     double dbow2_threshold=0.18;
 
     //number of keyframes to be used by the local optimization module
@@ -152,21 +154,22 @@ int main(int argc,char ** argv)
 
         //matches between images
         vector<int> left_index_matches, right_index_matches;
-        matchFeatures(features1, descriptors1, features2, descriptors2, left_index_matches, right_index_matches,
-                      dst_ratio,confidence,reproject_err,focal_length,pp);
+        matchFeatures(features1, descriptors1, features2, descriptors2, left_index_matches, 
+        right_index_matches,dst_ratio,confidence,reproject_err,focal_length,pp);
 
         //show matches for debug             
-        displayMatches(foto1_u, features1, left_index_matches,foto2_u, features2, right_index_matches);
+        displayMatches(foto1_u, features1, left_index_matches,foto2_u, features2, 
+        right_index_matches);
         Mat used_features=Mat::zeros(1,int(left_index_matches.size()),CV_64F);
 
         if(ident>0)
         {
-            add_new_projection_for_existent_point(ident,last_frame,current_frame,features1,features2,
-                                                  left_index_matches,right_index_matches,
+            add_new_projection_for_existent_point(ident,last_frame,current_frame,features1,
+                                                  features2,left_index_matches,right_index_matches,
                                                   used_features,tracks);
         }
-        add_new_points_proyections(features1,features2,left_index_matches,right_index_matches,ident,last_frame,current_frame,
-                                   used_features,tracks);
+        add_new_points_proyections(features1,features2,left_index_matches,right_index_matches,
+                                   ident,last_frame,current_frame,used_features,tracks);
 
         //update variables for next iteration
         foto1_u=foto2_u;
@@ -180,7 +183,8 @@ int main(int argc,char ** argv)
         current_frame++;
     }
     //initial map for the visual odometry system
-    initial_map_generation(tracks,nImages,img_threshold,ident,focal_length,principal_point,valid_points,keyframes,niter,z_plane);
+    initial_map_generation(tracks,nImages,img_threshold,ident,focal_length,principal_point,
+                           valid_points,keyframes,niter,z_plane);
     int last_found=0;
     double score=1;
 
@@ -206,16 +210,22 @@ int main(int argc,char ** argv)
             int res;
 
             //feature matching with custom filter and RANSAC filter
-            matchFeatures_and_compute_essential(foto1_u,foto2_u,last_frame,current_frame,features1,features2,descriptors1,descriptors2
-            ,left_points,right_points,left_idx,right_idx,mask,dst_ratio,
-            E,focal_length,confidence,reproject_err,pp,tracks);
+            matchFeatures_and_compute_essential(foto1_u,foto2_u,last_frame,current_frame,
+                                                features1,features2,descriptors1,descriptors2
+                                                ,left_points,right_points,left_idx,right_idx,mask,
+                                                dst_ratio,E,focal_length,confidence,
+                                                reproject_err,pp,tracks);
 
-            /*motion calculation. here we have two possibilities. If the keyframe is usefull for the 3d reconstruction
-            we update the camera pose and the 3D points map. Other way we discard the current keyframe and we search a new one*/
+            /*motion calculation. here we have two possibilities. If the keyframe is usefull 
+            for the 3d reconstruction we update the camera pose and the 3D points map. 
+            Other way we discard the current keyframe and we search a new one*/
+
             double scale=1;
             vector<Point3d> triangulated_points,new_points;
-            res=estimate_motion_and_calculate_3d_points(last_frame,current_frame,foto1_u,foto2_u,left_points,right_points,left_idx,right_idx,
-            ident,intrinsic,E,focal_length,pp,scale,mask,triangulated_points,tracks,valid_points,new_points);
+            res=estimate_motion_and_calculate_3d_points(last_frame,current_frame,foto1_u,foto2_u,
+                                                        left_points,right_points,left_idx,right_idx,ident,
+                                                        intrinsic,E,focal_length,pp,scale,mask,triangulated_points,
+                                                        tracks,valid_points,new_points);
             if(res==1)
             {
                 score=1;
@@ -279,8 +289,9 @@ int main(int argc,char ** argv)
 		    pcl::PointXYZ textPoint(cam_pos(0,3), cam_pos(1,3), cam_pos(2,3));
 		    viewer.addText3D(std::to_string(i), textPoint, 0.01, 1, 1, 1, "text_"+std::to_string(i));
             Eigen::Quaternionf q(cam_pos.matrix().block<3,3>(0,0));
-            file << tracks.frames_id[i] << " " << cam_pos(0,3) << " " <<  cam_pos(1,3) << " " << cam_pos(2,3) << " " << 
-                q.x() << " " << q.y() << " " << q.z() << " " << q.w() << std::endl;
+            file << tracks.frames_id[i] << " " << cam_pos(0,3) << " " <<  cam_pos(1,3) 
+                << " " << cam_pos(2,3) << " " << q.x() << " " << q.y() << " " << q.z() 
+                << " " << q.w() << std::endl;
         }
     }
     file.close();
@@ -289,7 +300,9 @@ int main(int argc,char ** argv)
     {
         if(valid_points[j]==1)
         {
-            pcl::PointXYZ p(tracks.triangulated_3d_points[j].x, tracks.triangulated_3d_points[j].y,tracks.triangulated_3d_points[j].z);
+            pcl::PointXYZ p(tracks.triangulated_3d_points[j].x,
+                            tracks.triangulated_3d_points[j].y,
+                            tracks.triangulated_3d_points[j].z);
             cloud.push_back(p);
         }
     }
