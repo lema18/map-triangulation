@@ -55,32 +55,31 @@ class tracking_store
 {
 
     public:
-    //map for 3d points projections
+    //3D points projections
     unordered_map<int,vector<Point2f>> pt_2d;
 
-    //map for image index of 3d points projections;
+    //3D points visibility along images;
     unordered_map<int,vector<int>> img_index;
 
-    //map for match index
+    //match index
     unordered_map<int,vector<int>> match_index;
 
-    //map for initialization of 3d_points
+    //3D points initialization 
     unordered_map<int,Eigen::Vector3d> init_guess;
 
-    //map for correspondences between vertex identificator and point identificator
+    //map for correspondences between vertex identifier in g2o and point identifier
     unordered_map<int,int> map_to_custom_struct;
 
-    //map of 3d points
+    //3D points
     unordered_map<int,cv::Point3d> triangulated_3d_points;
 
     //valid_frames_for_triangulation
     vector<int> frames_id;
     vector<int> valid_frames;
+
     //camera poses
     unordered_map<int,cv::Mat> cam_poses;
-    //function to add the projections of the new 3d points for two consecutive frames
-   
-    //default destructor
+
     ~tracking_store(){}
 };
 void matchFeatures(	vector<KeyPoint> &_features1, cv::Mat &_desc1, 
@@ -122,88 +121,93 @@ void fill_new_3d_points(int map_vertex,cv::Point3d pt,tracking_store &obj)
     obj.triangulated_3d_points[custom_structure_id]=pt;
 
 }
- void add_new_points_proyections(vector<KeyPoint> _features1,vector<KeyPoint> _features2,vector<int> _left_matches,vector<int> _right_matches,int &_point_identifier,int last_frame,int current_frame,Mat used_features,tracking_store &obj)
+
+void add_new_points_proyections(vector<KeyPoint> _features1,vector<KeyPoint> _features2,
+                                 vector<int> _left_matches,vector<int> _right_matches,
+                                 int &_point_identifier,int last_frame,int current_frame,
+                                 Mat used_features,tracking_store &obj)
+{
+    for (unsigned int i=0;i<_left_matches.size();i++)
     {
-        for (unsigned int i=0;i<_left_matches.size();i++)
+        if(used_features.at<double>(i)==0)
         {
-            if(used_features.at<double>(i)==0)
-            {
-                obj.pt_2d[_point_identifier]=vector<Point2f>();
-                obj.pt_2d[_point_identifier].push_back(_features1[_left_matches[i]].pt);
-                obj.img_index[_point_identifier]=vector<int>();
-                obj.img_index[_point_identifier].push_back(last_frame);
-                obj.match_index[_point_identifier]=vector<int>();
-                obj.match_index[_point_identifier].push_back(_left_matches[i]);
-                obj.pt_2d[_point_identifier].push_back(_features2[_right_matches[i]].pt);
-                obj.img_index[_point_identifier].push_back(current_frame);
-                obj.match_index[_point_identifier].push_back(_right_matches[i]);
-                _point_identifier++;
-            }
+            obj.pt_2d[_point_identifier]=vector<Point2f>();
+            obj.pt_2d[_point_identifier].push_back(_features1[_left_matches[i]].pt);
+            obj.img_index[_point_identifier]=vector<int>();
+            obj.img_index[_point_identifier].push_back(last_frame);
+            obj.match_index[_point_identifier]=vector<int>();
+            obj.match_index[_point_identifier].push_back(_left_matches[i]);
+            obj.pt_2d[_point_identifier].push_back(_features2[_right_matches[i]].pt);
+            obj.img_index[_point_identifier].push_back(current_frame);
+            obj.match_index[_point_identifier].push_back(_right_matches[i]);
+            _point_identifier++;
         }
     }
+}
 
-    //function to add a new projection for an existent point
-    void add_new_projection_for_existent_point(int _point_ident,int last_frame,int current_frame,vector<KeyPoint> _features1,vector<KeyPoint> _features2,vector<int> _left_matches,vector<int> _right_matches,Mat &used_points,tracking_store &obj)
+void add_new_projection_for_existent_point(int _point_ident,int last_frame,int current_frame,
+                                           vector<KeyPoint> _features1,vector<KeyPoint> _features2,
+                                           vector<int> _left_matches,vector<int> _right_matches,
+                                           Mat &used_points,tracking_store &obj)
+{
+    for(int j=0;j<_point_ident;j++)
     {
-        for(int j=0;j<_point_ident;j++)
+        auto search_match=obj.match_index.find(j);
+        auto search_img=obj.img_index.find(j);
+        if(search_match!=obj.match_index.end() && search_img!=obj.img_index.end())
         {
-            auto search_match=obj.match_index.find(j);
-            auto search_img=obj.img_index.find(j);
-            if(search_match!=obj.match_index.end() && search_img!=obj.img_index.end())
+            auto it_match=search_match->second.end();
+            it_match--;
+            auto it_img=search_img->second.end();
+            it_img--;
+            int last_match=*it_match;
+            int last_img=*it_img;
+            int flag=0;
+            for(unsigned int k=0;k<_left_matches.size() && !flag;k++)
             {
-                auto it_match=search_match->second.end();
-                it_match--;
-                auto it_img=search_img->second.end();
-                it_img--;
-                int last_match=*it_match;
-                int last_img=*it_img;
-                int flag=0;
-                for(unsigned int k=0;k<_left_matches.size() && !flag;k++)
+                if(_left_matches[k]==last_match && last_img==last_frame)
                 {
-                    if(_left_matches[k]==last_match && last_img==last_frame)
-                    {
-                            //we add the new projection for the same 3d point
-                            obj.pt_2d[j].push_back(_features2[_right_matches[k]].pt);
-                            obj.img_index[j].push_back(current_frame);
-                            obj.match_index[j].push_back(_right_matches[k]);
-                            used_points.at<double>(k)=1;
-                            flag=1;
-                    }
+                    //we add the new projection for the same 3d point
+                    obj.pt_2d[j].push_back(_features2[_right_matches[k]].pt);
+                    obj.img_index[j].push_back(current_frame);
+                    obj.match_index[j].push_back(_right_matches[k]);
+                    used_points.at<double>(k)=1;
+                    flag=1;
                 }
             }
         }
     }
+}
 
-    int extract_values(int ident,Eigen::Vector3d &xyz_coordinates,tracking_store &obj)
+int extract_values(int ident,Eigen::Vector3d &xyz_coordinates,tracking_store &obj)
+{
+    auto search_value=obj.init_guess.find(ident);
+    if(search_value !=obj.init_guess.end())
     {
-        auto search_value=obj.init_guess.find(ident);
-        if(search_value !=obj.init_guess.end())
-        {
-            xyz_coordinates=obj.init_guess[ident];
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-        
+        xyz_coordinates=obj.init_guess[ident];
+        return 1;
     }
+    else
+    {
+        return 0;
+    }    
+}
 
-    int extract_values(int ident,vector<Point2f> &projections,vector<int> &imgs,tracking_store &obj)
+int extract_values(int ident,vector<Point2f> &projections,vector<int> &imgs,tracking_store &obj)
+{
+    auto search_value=obj.pt_2d.find(ident);
+    if(search_value !=obj.pt_2d.end())
     {
-        auto search_value=obj.pt_2d.find(ident);
-        if(search_value !=obj.pt_2d.end())
-        {
-            projections=obj.pt_2d[ident];
-            imgs=obj.img_index[ident];
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-        
+        projections=obj.pt_2d[ident];
+        imgs=obj.img_index[ident];
+        return 1;
     }
+    else
+    {
+        return 0;
+    }
+        
+}
     void delete_invalid_points(int img_threshold,int total_points,int &remaining_points,vector<int> &valid_points,tracking_store &obj)
     {
         for(int i=0;i<total_points;i++)
@@ -225,7 +229,8 @@ void fill_new_3d_points(int map_vertex,cv::Point3d pt,tracking_store &obj)
         }
     }
 
-    void initial_guess_for_3d_points(int total_points,vector<int> valid_points,Eigen::Vector2d principal_point,double focal_length,tracking_store &obj,double z_plane)
+    void initial_guess_for_3d_points(int total_points,vector<int> valid_points,Eigen::Vector2d principal_point,
+                                     double focal_length,tracking_store &obj,double z_plane)
     {
         for(int i=0;i<total_points;i++)
         {
@@ -236,7 +241,7 @@ void fill_new_3d_points(int map_vertex,cv::Point3d pt,tracking_store &obj)
                 {
                     vector<Point2f> aux=obj.pt_2d[i];
                     double dimension=aux.size();
-                    double  z=z_plane; //initial z invented
+                    double  z=z_plane; //initial z
                     Eigen::Vector3d init_guess_aux;
                     init_guess_aux << 0.,0.,0.;
                     Eigen::Vector3d value;
@@ -254,14 +259,15 @@ void fill_new_3d_points(int map_vertex,cv::Point3d pt,tracking_store &obj)
             }
         }
     }
-    void set_correspondence(int map_ident,int structure_ident,tracking_store &obj)
-    {
-        obj.map_to_custom_struct[map_ident]=structure_ident;
-    }
+void set_correspondence(int map_ident,int structure_ident,tracking_store &obj)
+{
+     obj.map_to_custom_struct[map_ident]=structure_ident;
+}
 
 
 void displayMatches(	cv::Mat &_img1, std::vector<cv::KeyPoint> &_features1, std::vector<int> &_filtered1,
-						cv::Mat &_img2, std::vector<cv::KeyPoint> &_features2, std::vector<int> &_filtered2){
+						cv::Mat &_img2, std::vector<cv::KeyPoint> &_features2, std::vector<int> &_filtered2)
+{
 	cv::Mat display;
 	cv::hconcat(_img1, _img2, display);
 	cv::cvtColor(display, display, CV_GRAY2BGR);
@@ -298,33 +304,9 @@ void changeStructure(const cv::Mat &plain, vector<cv::Mat> &out)
     out[i] = plain.row(i);
   }
 }
-void loadFeatures(vector<vector<cv::Mat > > &features,int NIMAGES,string path)
+double calculate_score(int last_frame,int current_frame,const vector<cv::Mat> &descriptors_left,
+                       const vector<cv::Mat> &descriptors_right,string path)
 {
-  features.clear();
-  features.reserve(NIMAGES);
-
-  cv::Ptr<cv::ORB> orb = cv::ORB::create();
-
-  cout << "Extracting ORB features..." << endl;
-  for(int i = 0; i < NIMAGES; ++i)
-  {
-    stringstream ss;
-    ss << path << "/left_" << i << ".png";
-
-    cv::Mat image = cv::imread(ss.str(), 0);
-    cv::Mat mask;
-    vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-
-    orb->detectAndCompute(image, mask, keypoints, descriptors);
-
-    features.push_back(vector<cv::Mat >());
-    changeStructure(descriptors, features.back());
-  }
-}
-double calculate_score(int last_frame,int current_frame,const vector<cv::Mat> &descriptors_left,const vector<cv::Mat> &descriptors_right,string path)
-{
-    // lets do something with this vocabulary
     // load the vocabulary from disk
     OrbVocabulary voc(path);
     cout << "Matching images against themselves (0 low, 1 high): " << endl;
@@ -370,24 +352,30 @@ void setPointPos(pcl::PointXYZRGB &point,cv::Mat tras)
     point.y=tras.at<double>(1);
     point.z=tras.at<double>(2);
 }
-void initial_map_generation(tracking_store &obj,int nImages,int img_threshold,int &ident,double focal_length,Eigen::Vector2d principal_point,vector<int> &valid_points,vector<int> &keyframes,int niter,double z_plane)
+void initial_map_generation(tracking_store &obj,int nImages,int img_threshold,int &ident,double focal_length,
+                            Eigen::Vector2d principal_point,vector<int> &valid_points,vector<int> &keyframes,
+                            int niter,double z_plane)
 {
     g2o::SparseOptimizer optimizer;
     optimizer.setVerbose(false);
+
     std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
+
     linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>>();
-    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+
+    g2o::OptimizationAlgorithmLevenberg* solver = 
+    new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+
     optimizer.setAlgorithm(solver);
     //filter to reject points that are not visible in more than 3 images
     int remaining_points=0;
     delete_invalid_points(img_threshold,ident,remaining_points,valid_points,obj);
-    //we add camera vertices to optimizator
+    //we add camera vertices to optimizer
     vector<g2o::SE3Quat,Eigen::aligned_allocator<g2o::SE3Quat> > camera_poses;
     g2o::CameraParameters * cam_params = new g2o::CameraParameters (focal_length, principal_point, 0.);
     cam_params->setId(0);
     optimizer.addParameter(cam_params);
     int vertex_id=0;
-    //Eigen::Matrix4d initPose = Eigen::Matrix4d::Identity();
     for(int i=0;i<nImages;i++)
     {
         g2o::VertexSE3Expmap * v_se3=new g2o::VertexSE3Expmap();
@@ -416,10 +404,10 @@ void initial_map_generation(tracking_store &obj,int nImages,int img_threshold,in
             vertex_id++;
         }   
     } 
-    //calculation of initial guess for 3d points
+    //initial guess for 3d points
     int point_id=vertex_id;
     initial_guess_for_3d_points(ident,valid_points,principal_point,focal_length,obj,z_plane);
-    //we add 3dpoints vertices to optimizator and the edges conecting cameras and points
+    //we update g2o's variables
     
     for(int j=0;j<ident;j++)
     {
@@ -447,7 +435,8 @@ void initial_map_generation(tracking_store &obj,int nImages,int img_threshold,in
                 {
                     if(aux_im[p]==keyframes[k])
                     {
-                        e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(k)->second));
+                        e->setVertex(1,
+                        dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(k)->second));
                     }
                 }
                 e->setMeasurement(measurement);
@@ -573,7 +562,8 @@ cv::Mat R_2_to_1,cv::Mat t_2_to_1,vector<Point3d> &pts3d)
         pts3d.push_back(aux);
     }
 }
-void search_existent_points(int ident,int last_frame,vector<int> ref_match_idx,vector<int> &used_points,vector<int> &identifiers,tracking_store obj)
+void search_existent_points(int ident,int last_frame,vector<int> ref_match_idx,vector<int> &used_points,
+                            vector<int> &identifiers,tracking_store obj)
 {
     for(unsigned int i=0;i<ref_match_idx.size();i++)
     {   
@@ -633,7 +623,8 @@ cv::Point3d change_points_to_other_ref_system(const cv::Point3d &old_pt,cv::Mat 
     }
     return Point3d(res[0], res[1], res[2]);
 }
-void add_new_3d_point(int last_frame,int current_frame,cv::Point3d pt,int last_match,int curr_match,cv::Point2d left_project,cv::Point2d right_project,int &ident,tracking_store &obj)
+void add_new_3d_point(int last_frame,int current_frame,cv::Point3d pt,int last_match,int curr_match,
+                      cv::Point2d left_project,cv::Point2d right_project,int &ident,tracking_store &obj)
 {
     
     obj.triangulated_3d_points[ident]=pt;
@@ -652,14 +643,16 @@ void local_optimization(int window_size,tracking_store &obj,int niter,int ident,
     unordered_map<int,int> opt_to_custom;
     std::unique_ptr<g2o::BlockSolver_6_3::LinearSolverType> linearSolver;
     linearSolver = g2o::make_unique<g2o::LinearSolverCholmod<g2o::BlockSolver_6_3::PoseMatrixType>>();
-    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
+
+    g2o::OptimizationAlgorithmLevenberg* solver = 
+    new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2o::BlockSolver_6_3>(std::move(linearSolver)));
     opt.setAlgorithm(solver);
-    //we add camera vertices to optimizator
+
     vector<g2o::SE3Quat,Eigen::aligned_allocator<g2o::SE3Quat> > camera_poses;
     g2o::CameraParameters * cam_params = new g2o::CameraParameters (focal_length, principal_point, 0.);
     cam_params->setId(0);
     opt.addParameter(cam_params);
-    //search the "window_size" last valid_frames
+    // we search the "window_size" last valid_frames
     int dim=0;
     vector<Eigen::Matrix4d> inter_cam_poses;
     vector<int> identifiers;
@@ -676,7 +669,6 @@ void local_optimization(int window_size,tracking_store &obj,int niter,int ident,
         }
     }
     int vertex_id=0;
-    //Eigen::Matrix4d initPose = Eigen::Matrix4d::Identity();
     for(int i=1;i<=window_size;i++)
     {
         g2o::VertexSE3Expmap * v_se3=new g2o::VertexSE3Expmap();
@@ -708,9 +700,9 @@ void local_optimization(int window_size,tracking_store &obj,int niter,int ident,
             vertex_id++;
         }   
     } 
-    //calculation of initial guess for 3d points
+    //initial guess for 3d points
     int point_id=vertex_id;
-    //we add 3dpoints vertices to optimizator and the edges conecting cameras and points
+    //we update g2o's variables
     for(int j=0;j<ident;j++)
     {
         int not_yet=0;
@@ -793,12 +785,12 @@ void local_optimization(int window_size,tracking_store &obj,int niter,int ident,
 void update_3d_point(tracking_store &obj,int identifier,int match_id,int current_frame,cv::Point2d projection,cv::Point3d pt)
 {
     obj.triangulated_3d_points[identifier]=pt;
-    //obj.triangulated_3d_points[identifier]/=2;
     obj.match_index[identifier].push_back(match_id);
     obj.pt_2d[identifier].push_back(cv::Point2f((float)projection.x,(float)projection.y));
     obj.img_index[identifier].push_back(current_frame);
 }
-void matchFeatures_and_compute_essential(cv::Mat &img1,cv::Mat &img2, int last_frame,int current_frame,vector<KeyPoint> _features1,vector<KeyPoint> _features2,
+void matchFeatures_and_compute_essential(cv::Mat &img1,cv::Mat &img2, int last_frame,int current_frame,
+                                    vector<KeyPoint> _features1,vector<KeyPoint> _features2,
                                     cv::Mat _desc1,cv::Mat _desc2,
                                     vector<Point2f> &corresponding_left,vector<Point2f> &corresponding_right,
                                     vector<int> &left_index,vector<int> &right_index,
@@ -825,7 +817,8 @@ int estimate_motion_and_calculate_3d_points(int last_frame,int current_frame,cv:
                                             vector<Point2f> points_left,vector<Point2f> points_right,
                                             vector<int> index_left,vector<int> index_right,int &ident,
                                             cv::Mat &intrinsic,cv::Mat &E,double focal_lenght,Point2d pp,
-                                            double scale,cv::Mat &mask,vector<Point3d> &pts3d,tracking_store &obj,vector<int> &valid_points,vector<Point3d> &new_points)
+                                            double scale,cv::Mat &mask,vector<Point3d> &pts3d,tracking_store &obj,vector<int> &valid_points,
+                                            vector<Point3d> &new_points)
 {
     vector<Point2d> triangulation_points_left,triangulation_points_right;
     vector<int> inliers_recover_left,inliers_recover_right;
