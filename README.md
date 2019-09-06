@@ -11,8 +11,7 @@ argv[1]= Ruta a la carpeta en la que tenga almacenadas las imágenes del dataset
          left_i, donde i es el número de la imagen.
 argv[2]= Número de imágenes utilizadas para la creación del mapa inicial. Se recomienda que sea 50.
 argv[3]= Número de imágenes del dataset. 
-argv[4]= Ruta a la carpeta que tenga almacenada el vocabulario de palabras visuales de la imagen. Se proporciona dicho
-         vocabulario para el dataset freiburg1_xyz de TUM dataset. Este vocabulario está en el archivo small_voc.yml.gz
+argv[4]= Ruta a la carpeta en la que se encuentre el vocabulario de palabras visuales de la imagen. Se proporciona dicho vocabulario para el dataset freiburg1_xyz de TUM dataset. Este vocabulario está en el archivo small_voc.yml.gz
 argv[5]= variable para activar el módulo de optimización local(1 para activar, 0 para desactivar)
 
 El programa ha sido probado para una secuencia de 300 imágenes del dataset freiburg1_xyz de TUM: https://vision.in.tum.de/data/datasets/rgbd-dataset/download#freiburg1_xyz
