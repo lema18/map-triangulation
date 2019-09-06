@@ -1,6 +1,6 @@
 Implementación de un sistema de localización monocular.
 Para poder utilizarlo se requieren las siguientes dependencias:
--> La librería OpenCV en la versión 3.0 o superio: https://opencv.org/releases/
+-> La librería OpenCV en la versión 3.0 o superior: https://opencv.org/releases/
 -> La librería g2o: https://github.com/RainerKuemmerle/g2o
 -> La librería PCL: http://pointclouds.org/
 -> La librería Eigen para álgebra lineal: http://eigen.tuxfamily.org/index.php?title=Main_Page
