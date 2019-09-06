@@ -130,14 +130,17 @@ int main(int argc,char ** argv)
 	    Mat descriptors2;
 	    pt->detectAndCompute(foto2_u, Mat(), features2, descriptors2);
         vector<int> left_index_matches, right_index_matches;
-        matchFeatures(features1, descriptors1, features2, descriptors2, left_index_matches, right_index_matches,dst_ratio,confidence,reproject_err,focal_length,pp);
+        matchFeatures(features1, descriptors1, features2, descriptors2, left_index_matches, right_index_matches,
+		      dst_ratio,confidence,reproject_err,focal_length,pp);
         displayMatches(foto1_u, features1, left_index_matches,foto2_u, features2, right_index_matches);
-        Mat used_features=Mat::zeros(1,int(left_index_matches.size()),CV_64F);//to differentiate the features that are used from those that do not
+        Mat used_features=Mat::zeros(1,int(left_index_matches.size()),CV_64F);
         if(ident>0)
         {
-            add_new_projection_for_existent_point(ident,last_frame,current_frame,features1,features2,left_index_matches,right_index_matches,used_features,tracks);
+            add_new_projection_for_existent_point(ident,last_frame,current_frame,features1,features2,
+						  left_index_matches,right_index_matches,used_features,tracks);
         }
-        add_new_points_proyections(features1,features2,left_index_matches,right_index_matches,ident,last_frame,current_frame,used_features,tracks);
+        add_new_points_proyections(features1,features2,left_index_matches,right_index_matches,ident,last_frame,current_frame,
+				   used_features,tracks);
         foto1_u=foto2_u;
         features1=features2;
         descriptors1=descriptors2;
@@ -175,8 +178,9 @@ int main(int argc,char ** argv)
             E,focal_length,confidence,reproject_err,pp,tracks);
             double scale=1;
             vector<Point3d> triangulated_points,new_points;
-            res=estimate_motion_and_calculate_3d_points(last_frame,current_frame,foto1_u,foto2_u,left_points,right_points,left_idx,right_idx,
-            ident,intrinsic,E,focal_length,pp,scale,mask,triangulated_points,tracks,valid_points,new_points);
+            res=estimate_motion_and_calculate_3d_points(last_frame,current_frame,foto1_u,foto2_u,left_points,
+							right_points,left_idx,right_idx,ident,intrinsic,E,
+							focal_length,pp,scale,mask,triangulated_points,tracks,valid_points,new_points);
             if(use_local_opt)
             {
                 local_optimization(window_size,tracks,niter,ident,focal_length,principal_point);
