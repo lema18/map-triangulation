@@ -14,6 +14,8 @@ argv[3]= Número de imágenes del dataset.
 argv[4]= Ruta a la carpeta en la que se encuentre el vocabulario de palabras visuales de la imagen. Se proporciona dicho vocabulario para el dataset freiburg1_xyz de TUM dataset. Este vocabulario está en el archivo small_voc.yml.gz
 argv[5]= variable para activar el módulo de optimización local(1 para activar, 0 para desactivar)
 
+Si la persona que está consultando este repositorio viene de leer mi trabajo fin de grado, le será de gran ayuda el archivo c++_code.pdf. En este documento se explica el algoritmo paso a paso relacionándolo con el diagrama de flujo que se propone en la memoria de mi trabajo fin de grado.
+
 El programa ha sido probado para una secuencia de 300 imágenes del dataset freiburg1_xyz de TUM: https://vision.in.tum.de/data/datasets/rgbd-dataset/download#freiburg1_xyz
 Se proporciona la trayectoría real para compararla con la trayectoría que proporciona nuestro programa.
 La trayectoria real se almacena en el archivo "freiburg_xyz_groundtruth.txt" que se proporciona en este repositorio.
